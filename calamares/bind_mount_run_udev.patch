@@ -1,0 +1,12 @@
+--- calamares-2.4.orig/src/modules/mount/mount.conf
++++ calamares-2.4/src/modules/mount/mount.conf
+@@ -12,6 +12,9 @@ extraMounts:
+     - device: tmpfs
+       fs: tmpfs
+       mountPoint: /run
++    - device: /run/udev
++      mountPoint: /run/udev
++      options: bind
+ 
+ extraMountsEfi:
+     - device: efivarfs

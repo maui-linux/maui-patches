@@ -1,0 +1,13 @@
+Index: calamares-2.4/src/modules/partition/gui/PartitionViewStep.cpp
+===================================================================
+--- calamares-2.4.orig/src/modules/partition/gui/PartitionViewStep.cpp
++++ calamares-2.4/src/modules/partition/gui/PartitionViewStep.cpp
+@@ -250,6 +250,8 @@ PartitionViewStep::createSummaryWidget()
+         previewLabels->setModel( info.partitionModelAfter );
+         preview->setSelectionMode( QAbstractItemView::NoSelection );
+         previewLabels->setSelectionMode( QAbstractItemView::NoSelection );
++        previewLabels->setCustomNewRootLabel( Calamares::Branding::instance()->
++                                              string( Calamares::Branding::BootloaderEntryName ) );
+         info.partitionModelAfter->setParent( widget );
+         field = new QVBoxLayout;
+         CalamaresUtils::unmarginLayout( field );

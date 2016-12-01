@@ -1,0 +1,69 @@
+Index: calamares-2.4/src/modules/locale/LocaleConfiguration.cpp
+===================================================================
+--- calamares-2.4.orig/src/modules/locale/LocaleConfiguration.cpp
++++ calamares-2.4/src/modules/locale/LocaleConfiguration.cpp
+@@ -41,6 +41,7 @@ LocaleConfiguration::fromLanguageAndLoca
+ {
+     LocaleConfiguration lc = LocaleConfiguration();
+     QString language = languageLocale.split( '_' ).first();
++    lc.myLanguageLocaleBcp47 = language;
+ 
+     QStringList linesForLanguage;
+     foreach ( QString line, availableLocales )
+@@ -79,6 +80,10 @@ LocaleConfiguration::fromLanguageAndLoca
+         # locale categories reflect the selected location. */
+     if ( language == "pt" || language == "zh" )
+     {
++        if ( countryCode.toLower() == "br" || countryCode.toLower() == "cn" || countryCode.toLower() == "tw" )
++	{
++		lc.myLanguageLocaleBcp47 = language.toLower() + "-" + countryCode.toLower();
++	}
+         QString proposedLocale = QString( "%1_%2" ).arg( language )
+                                                    .arg( countryCode );
+         foreach ( QString line, linesForLanguage )
+Index: calamares-2.4/src/modules/locale/LocaleConfiguration.h
+===================================================================
+--- calamares-2.4.orig/src/modules/locale/LocaleConfiguration.h
++++ calamares-2.4/src/modules/locale/LocaleConfiguration.h
+@@ -38,6 +38,7 @@ public:
+     // avoid confusion with locale.h.
+     QString lang, lc_numeric, lc_time, lc_monetary, lc_paper, lc_name, lc_address,
+             lc_telephone, lc_measurement, lc_identification;
++    QString myLanguageLocaleBcp47;
+     QMap< QString, QString > toMap();
+ };
+ 
+Index: calamares-2.4/src/modules/locale/LocalePage.cpp
+===================================================================
+--- calamares-2.4.orig/src/modules/locale/LocalePage.cpp
++++ calamares-2.4/src/modules/locale/LocalePage.cpp
+@@ -471,6 +471,8 @@ LocalePage::updateGlobalStorage()
+             ->insert( "locationRegion", location.region );
+     Calamares::JobQueue::instance()->globalStorage()
+             ->insert( "locationZone", location.zone );
++    Calamares::JobQueue::instance()->globalStorage()
++            ->insert( "locale", m_selectedLocaleConfiguration.myLanguageLocaleBcp47);
+ 
+     // If we're in chroot mode (normal install mode), then we immediately set the
+     // timezone on the live system.
+Index: calamares-2.4/src/modules/packages/main.py
+===================================================================
+--- calamares-2.4.orig/src/modules/packages/main.py
++++ calamares-2.4/src/modules/packages/main.py
+@@ -99,6 +99,16 @@ def run_operations(pkgman, entry):
+     :param entry:
+     """
+     for key in entry.keys():
++        if libcalamares.globalstorage.contains("locale"):
++            if libcalamares.globalstorage.value("locale") != "en":
++                entry[key] = [pkg.replace("%LOCALE%", libcalamares.globalstorage.value("locale"))
++ for pkg in entry[key]]
++            else:
++                newlist = []
++                for i,pkg in enumerate(entry[key]):
++                    if "%LOCALE%" not in pkg:
++                        newlist.append(pkg)
++                entry[key] = newlist
+         if key == "install":
+             pkgman.install(entry[key])
+         elif key == "remove":

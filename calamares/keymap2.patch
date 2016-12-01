@@ -1,0 +1,149 @@
+diff --git a/src/modules/keyboard/KeyboardPage.cpp b/src/modules/keyboard/KeyboardPage.cpp
+index d1b62b4..9dafae8 100644
+--- a/src/modules/keyboard/KeyboardPage.cpp
++++ b/src/modules/keyboard/KeyboardPage.cpp
+@@ -202,7 +202,8 @@ KeyboardPage::prettyStatus() const
+ 
+ QList< Calamares::job_ptr >
+ KeyboardPage::createJobs( const QString& xOrgConfFileName,
+-                          const QString& convertedKeymapPath )
++                          const QString& convertedKeymapPath,
++                          bool writeEtcDefaultKeyboard )
+ {
+     QList< Calamares::job_ptr > list;
+     QString selectedModel = m_models.value( ui->comboBoxModel->currentText(),
+@@ -212,7 +213,8 @@ KeyboardPage::createJobs( const QString& xOrgConfFileName,
+                                                   m_selectedLayout,
+                                                   m_selectedVariant,
+                                                   xOrgConfFileName,
+-                                                  convertedKeymapPath );
++                                                  convertedKeymapPath,
++                                                  writeEtcDefaultKeyboard );
+     list.append( Calamares::job_ptr( j ) );
+ 
+     return list;
+diff --git a/src/modules/keyboard/KeyboardPage.h b/src/modules/keyboard/KeyboardPage.h
+index a2243e9..c60d62b 100644
+--- a/src/modules/keyboard/KeyboardPage.h
++++ b/src/modules/keyboard/KeyboardPage.h
+@@ -50,7 +50,8 @@ class KeyboardPage : public QWidget
+     QString prettyStatus() const;
+ 
+     QList< Calamares::job_ptr > createJobs( const QString& xOrgConfFileName,
+-                                            const QString& convertedKeymapPath );
++                                            const QString& convertedKeymapPath,
++                                            bool writeEtcDefaultKeyboard );
+ 
+     void onActivate();
+     void finalize();
+diff --git a/src/modules/keyboard/KeyboardViewStep.cpp b/src/modules/keyboard/KeyboardViewStep.cpp
+index fa6f60c..e6521e1 100644
+--- a/src/modules/keyboard/KeyboardViewStep.cpp
++++ b/src/modules/keyboard/KeyboardViewStep.cpp
+@@ -123,7 +123,9 @@ void
+ KeyboardViewStep::onLeave()
+ {
+     m_widget->finalize();
+-    m_jobs = m_widget->createJobs( m_xOrgConfFileName, m_convertedKeymapPath );
++    m_jobs = m_widget->createJobs( m_xOrgConfFileName,
++                                   m_convertedKeymapPath,
++                                   m_writeEtcDefaultKeyboard );
+     m_prettyStatus = m_widget->prettyStatus();
+ }
+ 
+@@ -157,4 +159,14 @@ KeyboardViewStep::setConfigurationMap( const QVariantMap& configurationMap )
+     {
+         m_convertedKeymapPath = QString();
+     }
++
++    if ( configurationMap.contains( "writeEtcDefaultKeyboard" ) &&
++         configurationMap.value( "writeEtcDefaultKeyboard" ).type() == QVariant::Bool )
++    {
++        m_writeEtcDefaultKeyboard = configurationMap.value( "writeEtcDefaultKeyboard" ).toBool();
++    }
++    else
++    {
++        m_writeEtcDefaultKeyboard = true;
++    }
+ }
+diff --git a/src/modules/keyboard/KeyboardViewStep.h b/src/modules/keyboard/KeyboardViewStep.h
+index 476d71a..2396392 100644
+--- a/src/modules/keyboard/KeyboardViewStep.h
++++ b/src/modules/keyboard/KeyboardViewStep.h
+@@ -64,6 +64,7 @@ class PLUGINDLLEXPORT KeyboardViewStep : public Calamares::ViewStep
+ 
+     QString m_xOrgConfFileName;
+     QString m_convertedKeymapPath;
++    bool m_writeEtcDefaultKeyboard;
+ 
+     QList< Calamares::job_ptr > m_jobs;
+ };
+diff --git a/src/modules/keyboard/SetKeyboardLayoutJob.cpp b/src/modules/keyboard/SetKeyboardLayoutJob.cpp
+index 80024cf..430a227 100644
+--- a/src/modules/keyboard/SetKeyboardLayoutJob.cpp
++++ b/src/modules/keyboard/SetKeyboardLayoutJob.cpp
+@@ -40,13 +40,15 @@ SetKeyboardLayoutJob::SetKeyboardLayoutJob( const QString& model,
+                                             const QString& layout,
+                                             const QString& variant,
+                                             const QString& xOrgConfFileName,
+-                                            const QString& convertedKeymapPath )
++                                            const QString& convertedKeymapPath,
++                                            bool writeEtcDefaultKeyboard)
+     : Calamares::Job()
+     , m_model( model )
+     , m_layout( layout )
+     , m_variant( variant )
+     , m_xOrgConfFileName( xOrgConfFileName )
+     , m_convertedKeymapPath( convertedKeymapPath )
++    , m_writeEtcDefaultKeyboard( writeEtcDefaultKeyboard )
+ {
+ }
+ 
+@@ -322,7 +324,7 @@ SetKeyboardLayoutJob::exec()
+         return Calamares::JobResult::error( tr( "Failed to write keyboard configuration for X11." ),
+                                             tr( "Failed to write to %1" ).arg( keyboardConfPath ) );
+ 
+-    if ( !defaultKeyboardPath.isEmpty() )
++    if ( !defaultKeyboardPath.isEmpty() && m_writeEtcDefaultKeyboard )
+     {
+         if ( !writeDefaultKeyboardData( defaultKeyboardPath ) )
+             return Calamares::JobResult::error( tr( "Failed to write keyboard configuration to existing /etc/default directory." ),
+diff --git a/src/modules/keyboard/SetKeyboardLayoutJob.h b/src/modules/keyboard/SetKeyboardLayoutJob.h
+index fb56281..8cafdeb 100644
+--- a/src/modules/keyboard/SetKeyboardLayoutJob.h
++++ b/src/modules/keyboard/SetKeyboardLayoutJob.h
+@@ -31,7 +31,8 @@ class SetKeyboardLayoutJob : public Calamares::Job
+                           const QString& layout,
+                           const QString& variant,
+                           const QString& xOrgConfFileName,
+-                          const QString& convertedKeymapPath );
++                          const QString& convertedKeymapPath,
++                          bool writeEtcDefaultKeyboard );
+ 
+     QString prettyName() const override;
+     Calamares::JobResult exec() override;
+@@ -49,6 +50,7 @@ class SetKeyboardLayoutJob : public Calamares::Job
+     QString m_variant;
+     QString m_xOrgConfFileName;
+     QString m_convertedKeymapPath;
++    const bool m_writeEtcDefaultKeyboard;
+ };
+ 
+ #endif /* SETKEYBOARDLAYOUTJOB_H */
+diff --git a/src/modules/keyboard/keyboard.conf b/src/modules/keyboard/keyboard.conf
+index a2606b9..9f8f275 100644
+--- a/src/modules/keyboard/keyboard.conf
++++ b/src/modules/keyboard/keyboard.conf
+@@ -3,6 +3,12 @@
+ # The default value is the name used by upstream systemd-localed.
+ # Relative paths are assumed to be relative to /etc/X11/xorg.conf.d
+ xOrgConfFileName: "/etc/X11/xorg.conf.d/00-keyboard.conf"
++
+ # The path to search for keymaps converted from X11 to kbd format
+ # Leave this empty if the setting does not make sense on your distribution.
+ convertedKeymapPath: "/lib/kbd/keymaps/xkb"
++
++# Write keymap configuration to /etc/default/keyboard, usually
++# found on Debian-related systems.
++# Defaults to true if nothing is set.
++#writeEtcDefaultKeyboard:   true 
